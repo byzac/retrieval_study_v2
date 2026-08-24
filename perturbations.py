@@ -30,6 +30,7 @@ def perturb_shuffle(frames: torch.Tensor, seed: int = 0) -> torch.Tensor:
     """Zerstört die Reihenfolge vollständig, behält alle Einzelbilder."""
     g = torch.Generator().manual_seed(seed)
     perm = torch.randperm(frames.shape[0], generator=g)
+
     return frames[perm]
 
 
@@ -48,10 +49,23 @@ def perturb_blur(frames: torch.Tensor, seed: int = 0, kernel_size: int = 15,
     return torch.stack([TF.gaussian_blur(f, kernel_size, sigma) for f in frames])
 
 
+def perturb_grayscale(frames: torch.Tensor, seed: int = 0) -> torch.Tensor:
+    """Entfernt Farbinformation, behält aber Kanten/Textur/räumliche Struktur
+    komplett intakt - im Gegensatz zu blur (das genau diese Struktur zerstört).
+    Bewusst NICHT Teil der Hauptmatrix (config.PERTURBATION_NAMES), aber
+    nützlich als gezielter Kontrolltest."""
+    import torchvision.transforms.functional as TF
+
+    return torch.stack([TF.rgb_to_grayscale(f, num_output_channels=3) for f in frames])
+
+
 PERTURBATIONS = {
     "clean": perturb_clean,
     "frame_repeat": perturb_frame_repeat,
     "shuffle": perturb_shuffle,
     "reverse": perturb_reverse,
     "blur": perturb_blur,
+    "grayscale": perturb_grayscale,
 }
+
+
