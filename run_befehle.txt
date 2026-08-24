@@ -4,5 +4,6 @@ python run_experiment.py --models slowfast --datasets kinetics400_subset
 python run_experiment.py --models dinov2 --datasets kinetics400_subset
 
 
+python run_experiment.py --models vjepa --datasets ssv2_subset
 python run_experiment.py --models slowfast --datasets ssv2_subset
-python run_experiment.py --models dinov2 --datasets ssv2_subse
+python run_experiment.py --models dinov2 --datasets ssv2_subset
