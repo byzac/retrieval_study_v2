@@ -39,23 +39,34 @@ def _uniform_frame_indices(total_frames: int, n_frames: int) -> list[int]:
 
 def load_video_frames(path: Path, n_frames: int, frame_size: int) -> torch.Tensor:
     """Lädt n_frames gleichmäßig gesampelte Frames aus einem Video.
-    Nutzt decord (schnell, GPU-fähig); Fallback auf torchvision.io."""
+    Nutzt decord (schnell, GPU-fähig); Fallback auf torchvision.io bei
+    fehlendem Modul ODER bei Laufzeit-Dekodierfehlern."""
     try:
         import decord
         decord.bridge.set_bridge("torch")
         vr = decord.VideoReader(str(path))
         indices = _uniform_frame_indices(len(vr), n_frames)
-        frames = vr.get_batch(indices)  # [T, H, W, C], uint8
-        frames = frames.permute(0, 3, 1, 2).float() / 255.0  # [T, C, H, W]
+        frames = vr.get_batch(indices)
+        frames = frames.permute(0, 3, 1, 2).float() / 255.0
     except ImportError:
         import torchvision
 
         video, _, _ = torchvision.io.read_video(str(path), output_format="TCHW")
         indices = _uniform_frame_indices(video.shape[0], n_frames)
         frames = video[indices].float() / 255.0
+    except Exception as e:
+        try:
+            import torchvision
 
-    # Auf einheitliche Größe bringen (Modelle resizen ggf. später erneut,
-    # aber ein einheitlicher Rohinput vereinfacht die Perturbationen)
+            video, _, _ = torchvision.io.read_video(str(path), output_format="TCHW")
+            indices = _uniform_frame_indices(video.shape[0], n_frames)
+            frames = video[indices].float() / 255.0
+        except Exception:
+            raise RuntimeError(
+                f"Video konnte weder mit decord noch mit torchvision.io gelesen "
+                f"werden: {path} (decord-Fehler: {e})"
+            ) from e
+
     frames = torch.nn.functional.interpolate(
         frames, size=(frame_size, frame_size), mode="bilinear", align_corners=False
     )
@@ -135,7 +146,11 @@ def build_dataset_subset(
         )
         chosen_videos = rng.sample(videos, min(n_videos_per_class, len(videos)))
         for vpath in chosen_videos:
-            frames = load_video_frames(vpath, n_frames, frame_size)
+            try:
+                frames = load_video_frames(vpath, n_frames, frame_size)
+            except RuntimeError as e:
+                print(f"  Warnung: Video übersprungen (nicht lesbar): {vpath.name} ({e})")
+                continue
             samples.append(VideoSample(video_id=vpath.stem, label=cls, frames=frames))
 
     print(f"[{root.name}] Subset geladen: {len(chosen_classes)} Klassen, "
