@@ -64,7 +64,8 @@ def run_one(model_name: str, dataset_name: str) -> list[dict]:
 
     clean_bank = build_bank(extractor, samples, PERTURBATIONS["clean"], seed=config.RANDOM_SEED)
     ref_metrics = reference_retrieval(clean_bank, k_values=config.RECALL_K)
-    print(f"  Referenz (clean vs clean): {ref_metrics}")
+    print(f"  Referenz-Retrieval (ungestörte Query vs. ungestörte Gallery): {ref_metrics}")
+    
 
     rows = []
     base_row = {"model": model_name, "dataset": dataset_name, "n_videos": len(samples)}

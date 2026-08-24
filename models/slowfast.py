@@ -31,9 +31,11 @@ class _PackPathway(torch.nn.Module):
 
     def forward(self, frames: torch.Tensor) -> list[torch.Tensor]:
         fast = frames
-        slow_idx = torch.linspace(0, frames.shape[1] - 1, frames.shape[1] // _ALPHA).long()
+        slow_idx = torch.linspace(0, frames.shape[1] - 1, frames.shape[1] // _ALPHA).long().to(frames.device)
         slow = torch.index_select(frames, 1, slow_idx)
         return [slow, fast]
+
+
 
 
 class SlowFastExtractor(VideoFeatureExtractor):
@@ -57,8 +59,8 @@ class SlowFastExtractor(VideoFeatureExtractor):
         def hook(module, inp, out):
             self._features["pooled"] = out
 
-        # blocks[-1] ist der ResNetBasicHead; .pool ist das Pooling davor
-        target_layer = self.model.blocks[-1].pool
+        
+        target_layer = self.model.blocks[5]
         target_layer.register_forward_hook(hook)
 
     def preprocess(self, frames: torch.Tensor):

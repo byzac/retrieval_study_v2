@@ -100,14 +100,15 @@ def _class_level_metrics(query_bank: EmbeddingBank, gallery_bank: EmbeddingBank,
 
 
 def reference_retrieval(clean_bank: EmbeddingBank, k_values=(1, 5, 10)) -> dict[str, float]:
-    """(A) Obere Schranke: Clean vs. Clean, eigenes Video aus der Gallery ausgeschlossen."""
+    """(A) Referenz-Retrieval (ungestörte Query vs ungestörte Gallery):
+    obere Schranke, eigenes Video aus der Gallery ausgeschlossen."""
     return _class_level_metrics(clean_bank, clean_bank, k_values, exclude_identical_id=True)
 
 
 def cross_condition_retrieval(clean_bank: EmbeddingBank, perturbed_bank: EmbeddingBank,
                                 k_values=(1, 5, 10)) -> dict[str, float]:
     """(B) Clean-Query gegen gestörte Gallery, Klassenebene."""
-    return _class_level_metrics(clean_bank, perturbed_bank, k_values, exclude_identical_id=False)
+    return _class_level_metrics(clean_bank, perturbed_bank, k_values, exclude_identical_id=True)
 
 
 def identity_retrieval(clean_bank: EmbeddingBank, perturbed_bank: EmbeddingBank,
@@ -142,6 +143,8 @@ def embedding_shift(clean_bank: EmbeddingBank, perturbed_bank: EmbeddingBank) ->
     cos_sim = (C * P).sum(dim=1)
     cos_dist = 1.0 - cos_sim
     return {
+        "mean_cosine_similarity": float(cos_sim.mean()),
+        "std_cosine_similarity": float(cos_sim.std()),
         "mean_cosine_shift": float(cos_dist.mean()),
         "std_cosine_shift": float(cos_dist.std()),
         "per_video_shift": {vid: float(d) for vid, d in zip(clean_bank.ids, cos_dist.tolist())},

@@ -6,3 +6,8 @@ pandas
 matplotlib
 seaborn
 tqdm
+fvcore         # Abhängigkeit von torch.hub facebookresearch/pytorchvideo (SlowFast)
+iopath         # dito
+transformers   # für V-JEPA2 über die HuggingFace-Integration (models/vjepa.py)
+jaxtyping      # Abhängigkeit von torch.hub CompVis/DisMo
+diffusers      # dito (DisMo-Repo ist an die CogVideoX-Pipeline gekoppelt)

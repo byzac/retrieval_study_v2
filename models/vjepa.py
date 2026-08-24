@@ -1,84 +1,50 @@
 """
-V-JEPA(2) Wrapper.
+V-JEPA2 Wrapper - über die HuggingFace-Integration (transformers), NICHT
+über torch.hub.
 
-WICHTIG - höherer Anpassungsaufwand als DINOv2/SlowFast:
-V-JEPA ist kein torch.hub-Modell mit fester API, sondern wird über das
-Repo https://github.com/facebookresearch/vjepa2 geladen. Die Repo-API
-kann sich zwischen Commits ändern. Dieser Wrapper zeigt das GRUNDPRINZIP
-(Checkpoint laden, Encoder-Only-Forward, Mean-Pool über Patch-Tokens),
-du musst vor dem ersten Lauf:
-  1. das Repo klonen und in den Pfad aufnehmen (sys.path o.ä.)
-  2. den exakten Import-Pfad für den Encoder-Builder prüfen
-     (z.B. `from src.models.vision_transformer import vit_large` o.ä. -
-     Name variiert je nach Repo-Version, siehe deren README/Beispielscript)
-  3. den Checkpoint-Pfad in `checkpoint_path` setzen (Download laut
-     Repo-README, Link von deinem Betreuer: ai.meta.com/research/vjepa)
+Hintergrund des Strategiewechsels: Der offizielle torch.hub-Endpunkt
+(facebookresearch/vjepa2) hat aktuell zwei Probleme, die nicht an unserem
+Code liegen: (1) der optionale Preprocessor braucht `cv2`, das wir nicht
+in den Requirements haben, und (2) der Checkpoint-Download zeigt auf eine
+offensichtlich interne Platzhalter-URL (`localhost:8300`) statt der
+echten Download-Adresse - ein Bug im Repo selbst, nicht behebbar von
+unserer Seite. Die HuggingFace-Integration hostet dieselben Gewichte
+direkt selbst und umgeht dieses kaputte hubconf.py komplett.
 
-Falls das zeitlich zu aufwändig wird, ist ein sauberer Fallback, V-JEPA
-über die HuggingFace-Integration zu laden (`transformers`, sofern für
-die verwendete V-JEPA2-Checkpointversion verfügbar) - dann vereinfacht
-sich preprocess()/forward() stark, analog zu models/dinov2.py.
+Benötigt: `pip install -U transformers`.
 """
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
+import numpy as np
 import torch
-import torch.nn.functional as F
 
 from .base import VideoFeatureExtractor
 
-_MEAN = [0.485, 0.456, 0.406]
-_STD = [0.229, 0.224, 0.225]
-_CROP_SIZE = 224
-_NUM_FRAMES = 16  # typische V-JEPA Clip-Länge, ggf. an Checkpoint anpassen
+_HF_REPO = "facebook/vjepa2-vitl-fpc64-256"  # ViT-L, 256px, kleinste sinnvolle Variante
 
 
 class VJEPAExtractor(VideoFeatureExtractor):
-    name = "vjepa"
+    name = "vjepa2-vitl-fpc64-256 (HuggingFace)"
 
-    def __init__(
-        self,
-        device: str | None = None,
-        repo_path: str = "/path/to/vjepa2",       # <-- anpassen
-        checkpoint_path: str = "/path/to/vjepa2_ckpt.pt",  # <-- anpassen
-    ):
+    def __init__(self, device: str | None = None, hf_repo: str = _HF_REPO):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
-        sys.path.insert(0, repo_path)
-        try:
-            # TODO: exakten Importpfad je nach Repo-Version verifizieren
-            from src.models.vision_transformer import vit_large  # type: ignore
-        except ImportError as e:
-            raise ImportError(
-                "Konnte V-JEPA-Encoder nicht importieren. Prüfe repo_path "
-                "und den Importpfad in models/vjepa.py gegen das aktuelle "
-                "facebookresearch/vjepa2 Repo (README / evals-Skripte "
-                "zeigen den korrekten Builder-Aufruf)."
-            ) from e
+        from transformers import AutoModel, AutoVideoProcessor
 
-        self.model = vit_large(img_size=_CROP_SIZE, num_frames=_NUM_FRAMES)
-        ckpt = torch.load(checkpoint_path, map_location="cpu")
-        state_dict = ckpt.get("encoder", ckpt.get("model", ckpt))
-        self.model.load_state_dict(state_dict, strict=False)
-        self.model = self.model.to(self.device).eval()
+        self.model = AutoModel.from_pretrained(hf_repo).to(self.device).eval()
+        self.processor = AutoVideoProcessor.from_pretrained(hf_repo)
 
-        self.mean = torch.tensor(_MEAN).view(1, 3, 1, 1, 1).to(self.device)
-        self.std = torch.tensor(_STD).view(1, 3, 1, 1, 1).to(self.device)
+    def preprocess(self, frames: torch.Tensor):
+        # frames: [T, C, H, W] float in [0, 1] -> HF-Prozessor erwartet
+        # rohe Frame-Arrays (uint8, HWC), Normalisierung macht er selbst
+        frames_np = (frames.permute(0, 2, 3, 1).cpu().numpy() * 255).astype(np.uint8)
+        video_list = [frames_np[t] for t in range(frames_np.shape[0])]
 
-    def preprocess(self, frames: torch.Tensor) -> torch.Tensor:
-        # frames: [T, C, H, W] -> [1, C, T, H, W]
-        x = frames.permute(1, 0, 2, 3).unsqueeze(0).to(self.device)
-        x = F.interpolate(
-            x, size=(_NUM_FRAMES, _CROP_SIZE, _CROP_SIZE),
-            mode="trilinear", align_corners=False,
-        )
-        x = (x - self.mean) / self.std
-        return x
+        inputs = self.processor([video_list], return_tensors="pt")
+        return {k: v.to(self.device) for k, v in inputs.items()}
 
-    def forward(self, model_input: torch.Tensor) -> torch.Tensor:
-        # Encoder-Only-Forward -> Patch-Token-Sequenz [1, N, D]
-        tokens = self.model(model_input)
-        return tokens.mean(dim=1).squeeze(0)  # Mean-Pool über alle Tokens -> [D]
+    def forward(self, model_input: dict) -> torch.Tensor:
+        with torch.no_grad():
+            output = self.model(**model_input)
+        return output.last_hidden_state.mean(dim=1).squeeze(0)

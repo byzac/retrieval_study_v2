@@ -78,9 +78,10 @@ def build_subset(raw_root: Path, output_root: Path, split: str,
         )
 
     video_dir_candidates = [
-        raw_root / "20bn-something-something-v2",
-        raw_root / "videos",
-        raw_root,
+    raw_root / "20bn-something-something-v2",
+    raw_root / "videos" / "20bn-something-something-v2",
+    raw_root / "videos",
+    raw_root,
     ]
     video_dir = next((d for d in video_dir_candidates if d.exists() and any(d.glob("*.webm"))), None)
     if video_dir is None:

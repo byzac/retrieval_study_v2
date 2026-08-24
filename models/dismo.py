@@ -47,7 +47,7 @@ class DisMoExtractor(VideoFeatureExtractor):
     def __init__(self, device: str | None = None):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.model = (
-            torch.hub.load("CompVis/DisMo", "motion_extractor_large")
+            torch.hub.load("CompVis/DisMo", "motion_extractor_large", trust_repo=True)
             .to(self.device)
             .eval()
         )

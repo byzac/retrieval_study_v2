@@ -25,6 +25,29 @@ pip install -r requirements.txt
    python analyze_results.py --dataset ssv2_subset
    ```
 
+## TODO (vor finaler Ergebnisinterpretation/Methodikkapitel klären)
+
+**Pretraining-Daten-Kontamination pro Modell dokumentieren.** Blockiert
+aktuell nichts (kein Trainingslauf involviert, Subsets sind fertig), sollte
+aber vor der finalen Interpretation der Ergebnisse geprüft und im
+Methodik-/Limitations-Kapitel dokumentiert werden: Könnte ein Modell Teile
+der Evaluationsvideos bereits während seines eigenen Pretrainings gesehen
+haben? Das würde einen fairen Modellvergleich potenziell verzerren
+(ein Modell wäre "vertrauter" mit den Testdaten als die anderen drei).
+
+| Modell | Pretraining-Daten | Kinetics-400 betroffen? | SSv2 betroffen? |
+|---|---|---|---|
+| DINOv2 | LVD-142M (kuratierte Bilddaten) | nein | nein |
+| SlowFast (`torch.hub`-Standardcheckpoint) | Kinetics-400-**Train** (supervised) | nein (Val-Split, offiziell getrennt von Train) | nein |
+| V-JEPA | noch zu verifizieren (Repo-Doku/Paper prüfen) | zu prüfen | zu prüfen |
+| DisMo | noch zu verifizieren (Repo-Doku/Paper prüfen) | zu prüfen | zu prüfen |
+
+Empfohlener Formulierungsbaustein für die Limitations-Sektion:
+*"Da vortrainierte Modelle verwendet wurden, kann nicht für alle Modelle
+vollständig ausgeschlossen werden, dass Teile der Kinetics-400- bzw.
+SSv2-Evaluationsdaten bereits während des jeweiligen Pretrainings enthalten
+waren."*
+
 ## Retrieval-Protokoll (für Kap. 4.4 der Arbeit)
 
 Vier Bausteine, siehe Docstring in `retrieval.py` für Details:

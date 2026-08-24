@@ -1,0 +1,6 @@
+class_mAP,class_recall@1,class_recall@10,class_recall@5,dataset,identity_mean_rank,identity_median_rank,identity_recall@1,identity_recall@10,identity_recall@5,model,n_videos,perturbation,shift_mean_cosine_shift,shift_std_cosine_shift
+0.1795609385988999,0.418,0.798,0.678,kinetics400_subset,,,,,,vjepa,500,clean,,
+0.15735583379226636,0.344,0.744,0.622,kinetics400_subset,7.536,1.0,0.814,0.928,0.896,vjepa,500,frame_repeat,0.2723845839500427,0.09492670744657516
+0.17708390786462308,0.414,0.79,0.694,kinetics400_subset,1.004,1.0,0.996,1.0,1.0,vjepa,500,shuffle,0.04718146473169327,0.025085903704166412
+0.18621861235317652,0.426,0.81,0.698,kinetics400_subset,1.0,1.0,1.0,1.0,1.0,vjepa,500,reverse,0.022603560239076614,0.020323263481259346
+0.09723321434207106,0.15,0.472,0.35,kinetics400_subset,22.012,7.0,0.208,0.602,0.458,vjepa,500,blur,0.36012354493141174,0.08111970126628876

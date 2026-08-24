@@ -18,14 +18,14 @@ RESULTS_DIR.mkdir(exist_ok=True)
 #   DATASET_ROOT / <split> / <class_name> / <video_id>.mp4
 DATASETS = {
     "kinetics400_subset": {
-        "root": Path("/data/kinetics400_subset"),   # <-- anpassen
+        "root": Path("C:/data/kinetics400_subset"),
         "split": "val",
-        "n_classes": 25,          # Subset-Größe: 25 Klassen
-        "n_videos_per_class": 20, # x 20 Videos = 500 Videos gesamt
+        "n_classes": 25,
+        "n_videos_per_class": 20,
         "seed": 42,
     },
     "ssv2_subset": {
-        "root": Path("/data/ssv2_subset"),           # <-- anpassen
+        "root": Path("C:/data/ssv2_subset"),
         "split": "val",
         "n_classes": 25,
         "n_videos_per_class": 20,
