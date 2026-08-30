@@ -20,14 +20,14 @@ DATASETS = {
     "kinetics400_subset": {
         "root": Path("C:/data/kinetics400_subset"),
         "split": "val",
-        "n_classes": 50,
+        "n_classes": 100,
         "n_videos_per_class": 50,
         "seed": 42,
     },
     "ssv2_subset": {
         "root": Path("C:/data/ssv2_subset"),
         "split": "val",
-        "n_classes": 50,
+        "n_classes": 100,
         "n_videos_per_class": 50,
         "seed": 42,
     },

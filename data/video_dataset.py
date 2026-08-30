@@ -4,9 +4,16 @@ Dataset-Loading für lokal gespeicherte Video-Subsets.
 Erwartetes Layout (Standard nach Download der offiziellen Splits):
     <root>/<split>/<class_name>/<video_id>.mp4
 
-Liefert VideoSample-Objekte mit rohen Frames [T, C, H, W] float 0..1,
-gleichmäßig über die Cliplänge gesampelt (Standardvorgehen für
-Clip-Level-Embeddings, siehe z.B. VideoMAE/SlowFast-Papers).
+WICHTIGER SPEICHER-FIX: VideoSample speichert nur noch den Dateipfad,
+KEINE vorab decodierten Frames mehr. Vorher wurden bei build_dataset_subset()
+alle Videos eines Subsets sofort vollständig decodiert und im Speicher
+gesammelt - bei größeren Subsets (z.B. 100 Klassen x 50 Videos, ~5000
+Videos) führte das zu einem Speicherbedarf von >90 GB (bei 32 Frames x
+224x224x3 float32 pro Video ≈ 19 MB/Video) und damit zu einem Absturz auf
+Systemen mit weniger RAM. Jetzt werden nur Pfade gesammelt; das eigentliche
+Decodieren passiert individuell und speicherschonend in build_bank()
+(siehe retrieval.py), direkt vor der Embedding-Berechnung, sodass jeweils
+nur EIN Video gleichzeitig als decodierter Tensor im Speicher liegt.
 """
 
 from __future__ import annotations
@@ -23,7 +30,7 @@ import torch
 class VideoSample:
     video_id: str
     label: str
-    frames: torch.Tensor  # [T, C, H, W], float32, Werte in [0, 1]
+    path: Path  # Pfad statt vorab geladener Frames (siehe Speicher-Fix oben)
 
 
 def _uniform_frame_indices(total_frames: int, n_frames: int) -> list[int]:
@@ -91,6 +98,10 @@ def build_flat_subset(
     die auf Video-Identität statt Klassenzugehörigkeit beruhen. Genau
     diese beiden reichen aus, um zu prüfen, ob die Pipeline technisch
     korrekt läuft.
+
+    Hinweis: n_frames/frame_size werden hier nicht mehr direkt zum Laden
+    verwendet (siehe Speicher-Fix oben), bleiben aber in der Signatur für
+    Abwärtskompatibilität mit smoke_test.py.
     """
     rng = random.Random(seed)
     if not root.exists():
@@ -104,12 +115,11 @@ def build_flat_subset(
 
     chosen = rng.sample(all_videos, min(n_videos, len(all_videos)))
 
-    samples: list[VideoSample] = []
-    for vpath in chosen:
-        frames = load_video_frames(vpath, n_frames, frame_size)
-        samples.append(VideoSample(video_id=vpath.stem, label=vpath.stem, frames=frames))
+    samples: list[VideoSample] = [
+        VideoSample(video_id=vpath.stem, label=vpath.stem, path=vpath) for vpath in chosen
+    ]
 
-    print(f"[flat, ohne Labels] {len(samples)} Videos geladen aus {root}. "
+    print(f"[flat, ohne Labels] {len(samples)} Video-Pfade gesammelt aus {root}. "
           f"Nur identity_retrieval/embedding_shift sind hier aussagekräftig.")
     return samples
 
@@ -126,7 +136,14 @@ def build_dataset_subset(
     """Sampelt ein kontrolliertes Subset: n_classes Klassen, davon je
     n_videos_per_class Videos. Deterministisch über `seed`, damit über
     alle Modelle/Perturbationen exakt dieselben Videos verwendet werden
-    (wichtig für Vergleichbarkeit der Matrix!)."""
+    (wichtig für Vergleichbarkeit der Matrix!).
+
+    WICHTIG (Speicher-Fix): Sammelt nur Dateipfade, KEINE decodierten
+    Frames. Das eigentliche Decodieren (inkl. Fehlerbehandlung für
+    defekte Videos) passiert individuell in build_bank() (retrieval.py).
+    n_frames/frame_size werden hier nicht mehr direkt genutzt, bleiben
+    aber Teil der Signatur, damit run_experiment.py unverändert bleibt.
+    """
     rng = random.Random(seed)
     split_dir = root / split
     if not split_dir.exists():
@@ -146,13 +163,9 @@ def build_dataset_subset(
         )
         chosen_videos = rng.sample(videos, min(n_videos_per_class, len(videos)))
         for vpath in chosen_videos:
-            try:
-                frames = load_video_frames(vpath, n_frames, frame_size)
-            except RuntimeError as e:
-                print(f"  Warnung: Video übersprungen (nicht lesbar): {vpath.name} ({e})")
-                continue
-            samples.append(VideoSample(video_id=vpath.stem, label=cls, frames=frames))
+            samples.append(VideoSample(video_id=vpath.stem, label=cls, path=vpath))
 
-    print(f"[{root.name}] Subset geladen: {len(chosen_classes)} Klassen, "
-          f"{len(samples)} Videos gesamt.")
+    print(f"[{root.name}] Subset zusammengestellt: {len(chosen_classes)} Klassen, "
+          f"{len(samples)} Video-Pfade (Decodierung erfolgt individuell pro Lauf, "
+          f"siehe build_bank() in retrieval.py).")
     return samples

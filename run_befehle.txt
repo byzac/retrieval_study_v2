@@ -1,3 +1,7 @@
+Cache löschen:
+Get-ChildItem -Recurse -Include __pycache__ -Directory | Remove-Item -Recurse -Force
+
+
 python run_experiment.py --models dismo --datasets kinetics400_subset
 python run_experiment.py --models vjepa --datasets kinetics400_subset
 python run_experiment.py --models slowfast --datasets kinetics400_subset

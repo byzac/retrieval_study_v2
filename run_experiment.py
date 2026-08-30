@@ -51,7 +51,7 @@ def run_one(model_name: str, dataset_name: str, perturbation_names: list[str]) -
         split=ds_cfg["split"],
         n_classes=ds_cfg["n_classes"],
         n_videos_per_class=ds_cfg["n_videos_per_class"],
-        n_frames=config.N_FRAMES_RAW,
+        n_frames=config.N_FRAMES_RAW, 
         frame_size=config.FRAME_SIZE,
         seed=ds_cfg["seed"],
     )
